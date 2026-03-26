@@ -20,6 +20,8 @@ fi
 echo "[*] Removing user '$CTF_USER' and home directory..."
 # Kill any running processes by this user first
 pkill -u "$CTF_USER" 2>/dev/null || true
+sleep 2
+pkill -9 -u "$CTF_USER" 2>/dev/null || true
 # Delete user and home dir
 userdel -r "$CTF_USER"
 echo "[+] Done. User '$CTF_USER' and /home/$CTF_USER removed."
