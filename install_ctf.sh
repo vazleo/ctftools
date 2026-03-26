@@ -73,17 +73,22 @@ info "Installing Ghidra..."
 if [[ -n "$(find "$TOOLS_DIR" -maxdepth 1 -type d -name "ghidra_*" 2>/dev/null)" ]]; then
     skip "Ghidra already installed in $TOOLS_DIR"
 else
-    info "Fetching latest Ghidra release info from GitHub..."
-    RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/latest)
-    GHIDRA_URL=$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep '\.zip"' | head -1 | sed 's/.*"browser_download_url": "\(.*\)".*/\1/')
+    if [[ -f "$SCRIPT_DIR/downloads/ghidra.zip" ]]; then
+        info "Using bundled downloads/ghidra.zip..."
+        cp "$SCRIPT_DIR/downloads/ghidra.zip" /tmp/ghidra.zip
+    else
+        info "Fetching latest Ghidra release info from GitHub..."
+        RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/latest)
+        GHIDRA_URL=$(echo "$RELEASE_JSON" | grep '"browser_download_url"' | grep '\.zip"' | head -1 | sed 's/.*"browser_download_url": "\(.*\)".*/\1/')
 
-    if [[ -z "$GHIDRA_URL" ]]; then
-        echo "[!] Could not determine Ghidra download URL. Check your internet connection and try again."
-        exit 1
+        if [[ -z "$GHIDRA_URL" ]]; then
+            echo "[!] Could not determine Ghidra download URL. Check your internet connection and try again."
+            exit 1
+        fi
+
+        info "Downloading Ghidra from $GHIDRA_URL ..."
+        wget -q --show-progress -O /tmp/ghidra.zip "$GHIDRA_URL"
     fi
-
-    info "Downloading Ghidra from $GHIDRA_URL ..."
-    wget -q --show-progress -O /tmp/ghidra.zip "$GHIDRA_URL"
     unzip -q /tmp/ghidra.zip -d "$TOOLS_DIR"
     rm /tmp/ghidra.zip
 
@@ -104,10 +109,15 @@ info "Installing Burp Suite Community..."
 if [[ -f "$BURP_JAR" ]]; then
     skip "Burp Suite JAR already exists at $BURP_JAR"
 else
-    info "Downloading Burp Suite Community JAR..."
-    wget -q --show-progress \
-        -O "$BURP_JAR" \
-        "https://portswigger.net/burp/releases/download?product=community&type=Jar"
+    if [[ -f "$SCRIPT_DIR/downloads/burpsuite.jar" ]]; then
+        info "Using bundled downloads/burpsuite.jar..."
+        cp "$SCRIPT_DIR/downloads/burpsuite.jar" "$BURP_JAR"
+    else
+        info "Downloading Burp Suite Community JAR..."
+        wget -q --show-progress \
+            -O "$BURP_JAR" \
+            "https://portswigger.net/burp/releases/download?product=community&type=Jar"
+    fi
 
     # Wrapper script so 'burpsuite' is on PATH
     cat > "$TOOLS_DIR/burpsuite" <<'EOF'
