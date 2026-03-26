@@ -1,0 +1,38 @@
+---
+- name: Deploy CTF tools to lab machines
+  hosts: all
+  become: true
+
+  vars:
+    bundle_src: "{{ playbook_dir }}/../bundle.tar.gz"
+    remote_dir: /tmp/ctf-install
+
+  tasks:
+    - name: Copy bundle to machine
+      copy:
+        src: "{{ bundle_src }}"
+        dest: /tmp/bundle.tar.gz
+
+    - name: Create install directory
+      file:
+        path: "{{ remote_dir }}"
+        state: directory
+
+    - name: Extract bundle
+      unarchive:
+        src: /tmp/bundle.tar.gz
+        dest: "{{ remote_dir }}"
+        remote_src: true
+
+    - name: Run install script
+      command: bash {{ remote_dir }}/install_ctf.sh
+      args:
+        chdir: "{{ remote_dir }}"
+
+    - name: Clean up
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/bundle.tar.gz
+        - "{{ remote_dir }}"
