@@ -1,6 +1,6 @@
 # CTF Tools Installer
 
-Bash scripts to set up and tear down a CTF environment on Linux (Ubuntu/Mint) lab machines. Designed to be run once with sudo — creates an isolated `ctf` user and installs all tools under their home directory.
+Bash scripts to set up and tear down a CTF environment on Linux (Ubuntu/Mint) lab machines. Creates an isolated `ctf` user and installs all tools under their home directory. Supports single-machine installs, offline bundles, and mass deployment via SSH or Ansible.
 
 ## Tools installed
 
@@ -16,14 +16,23 @@ Bash scripts to set up and tear down a CTF environment on Linux (Ubuntu/Mint) la
 ## Requirements
 
 - Ubuntu 22.04+ or Linux Mint 21+ (apt-based)
-- Internet access during installation
-- Run with `sudo`
+- `sudo` access
+- Internet access (or a pre-built bundle — see below)
 
-## Usage
+## Scripts overview
 
-### Configure
+| Script | Purpose |
+|--------|---------|
+| `install_ctf.sh` | Creates `ctf` user and installs all tools |
+| `uninstall_ctf.sh` | Removes the `ctf` user and all their files |
+| `make_bundle.sh` | Downloads Ghidra and Burp Suite into `downloads/` and packs `bundle.tar.gz` |
+| `scan.sh` | Nmap ping scan to find live lab machines, saves last octets to `ips.txt` |
+| `deploy.sh` | Pushes the bundle to all machines in `ips.txt` via SSH and runs the install |
+| `ansible/deploy.yml` | Ansible alternative to `deploy.sh` |
 
-Copy `.env.example` to `.env` and set your password:
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your values:
 
 ```bash
 cp .env.example .env
@@ -31,19 +40,25 @@ nano .env
 ```
 
 ```
-CTF_USER=ctf
-CTF_PASS=your_password_here
+CTF_USER=ctf                        # user that will be created on each machine
+CTF_PASS=your_password_here         # password for the ctf user
+
+LAB_USER=your_lab_user_here         # existing user on lab machines (for file transfer)
+LAB_PASS=your_lab_password_here
+SUDO_USER=your_sudo_user_here       # user with sudo rights on lab machines
+SUDO_PASS=your_sudo_password_here
+IP_PREFIX=xxx.xxx.xxx               # first three octets of the lab subnet
 ```
 
-### Install
+## Single machine install
 
 ```bash
 sudo bash install_ctf.sh
 ```
 
-Creates user `ctf`, installs all tools under `/home/ctf/`, and configures the environment. Takes a few minutes due to large downloads (Ghidra ~486MB, Burp Suite ~645MB).
+If `downloads/ghidra.zip` and `downloads/burpsuite.jar` exist (from `make_bundle.sh`), the script uses those instead of downloading. Otherwise it fetches them from the internet.
 
-### Uninstall
+## Uninstall
 
 ```bash
 sudo bash uninstall_ctf.sh
@@ -51,9 +66,49 @@ sudo bash uninstall_ctf.sh
 
 Deletes the `ctf` user and their entire home directory. System packages (gdb, JDK, exiftool) are left in place.
 
+## Mass deployment
+
+### 1. Build the bundle (run once)
+
+Downloads Ghidra and Burp Suite and packs everything into `bundle.tar.gz`:
+
+```bash
+bash make_bundle.sh
+```
+
+### 2. Scan the network
+
+Finds live machines on the subnet defined in `.env` and saves their last octets to `ips.txt`:
+
+```bash
+sudo bash scan.sh
+```
+
+Review `ips.txt` before deploying — remove any machines you don't want to touch.
+
+### 3a. Deploy via SSH
+
+Requires `sshpass`: `sudo apt-get install -y sshpass`
+
+```bash
+bash deploy.sh
+```
+
+Copies `bundle.tar.gz` to each machine, extracts it, and runs `install_ctf.sh` with sudo. Prints a summary of successes and failures at the end.
+
+### 3b. Deploy via Ansible
+
+Requires Ansible installed and inventory already configured:
+
+```bash
+ansible-playbook ansible/deploy.yml
+```
+
+Expects `bundle.tar.gz` in the repo root.
+
 ## Logging in as the CTF user
 
-From the desktop login screen, log in as `ctf` / `ctfgris`.
+From the desktop login screen, log in as `ctf` with the password set in `.env`.
 
 Or from a terminal:
 ```bash
@@ -74,7 +129,7 @@ New project → import your binary → double-click it → CodeBrowser → decom
 ```bash
 burpsuite &
 ```
-Use a temporary project → Proxy tab → Open Browser → traffic flows through Burp.
+Temporary project → Proxy tab → Open Browser → traffic flows through Burp.
 
 **pwndbg** — binary debugging
 ```bash
